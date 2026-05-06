@@ -1,5 +1,5 @@
 /* ============================================================
-   main.css — JSONL Table Explorer
+   main.css — Data Studio
    All styles for the webview UI.
    ============================================================ */
 
@@ -19,9 +19,9 @@ body {
 
 /* ── Buttons ───────────────────────────────────────────────── */
 button {
-  padding: 3px 10px;
+  padding: 4px 10px;
   border: 1px solid var(--vscode-button-border, transparent);
-  border-radius: 2px;
+  border-radius: 6px;
   background: var(--vscode-button-secondaryBackground);
   color: var(--vscode-button-secondaryForeground);
   cursor: pointer;
@@ -34,11 +34,24 @@ button {
 }
 button:hover { background: var(--vscode-button-secondaryHoverBackground); }
 
+button:disabled,
+button[aria-disabled="true"] {
+  opacity: .45;
+  cursor: default;
+}
+
+button:disabled:hover,
+button[aria-disabled="true"]:hover {
+  background: var(--vscode-button-secondaryBackground);
+}
+
 button.primary {
   background: var(--vscode-button-background);
   color: var(--vscode-button-foreground);
 }
 button.primary:hover { background: var(--vscode-button-hoverBackground); }
+button.primary:disabled:hover,
+button.primary[aria-disabled="true"]:hover { background: var(--vscode-button-background); }
 
 button.danger {
   background: transparent;
@@ -68,27 +81,39 @@ input[type="number"] { width: 60px; }
 #toolbar {
   display: flex;
   align-items: center;
-  gap: 5px;
-  padding: 5px 10px;
+  gap: 8px;
+  padding: 8px 12px;
   background: var(--vscode-editorGroupHeader-tabsBackground);
   border-bottom: 1px solid var(--vscode-panel-border);
   flex-shrink: 0;
   flex-wrap: wrap;
 }
-#toolbar .file-name {
-  font-weight: 600;
-  margin-right: 6px;
-  color: var(--vscode-tab-activeForeground);
-  font-size: 12px;
-}
-#toolbar .sep { flex: 1; min-width: 8px; }
 #toolbar .font-size-label { font-size: 11px; opacity: .8; }
+
+.toolbar-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding-inline: 6px;
+  border-left: 1px solid var(--vscode-panel-border);
+}
+
+.toolbar-primary {
+  border-left: 0;
+}
+
+.toolbar-density {
+  flex-basis: 100%;
+  justify-content: flex-end;
+  margin-left: auto;
+  border-left: 0;
+}
 
 /* ── Filter row ────────────────────────────────────────────── */
 #filterRow {
   display: none;
   gap: 6px;
-  padding: 5px 10px;
+  padding: 7px 12px;
   background: var(--vscode-editorWidget-background);
   border-bottom: 1px solid var(--vscode-panel-border);
   flex-wrap: wrap;
@@ -139,10 +164,10 @@ thead {
 }
 
 th {
-  padding: 5px 8px;
+  padding: 7px 10px;
   text-align: left;
   border-right: 1px solid var(--vscode-panel-border);
-  border-bottom: 2px solid var(--vscode-panel-border);
+  border-bottom: 1px solid var(--vscode-panel-border);
   font-size: 12px;
   font-weight: 600;
   white-space: nowrap;
@@ -195,14 +220,14 @@ th:hover .col-resizer {
 }
 
 td {
-  padding: 4px 8px;
+  padding: 6px 10px;
   border-right: 1px solid var(--vscode-panel-border);
   border-bottom: 1px solid var(--vscode-panel-border);
   font-size: var(--table-font-size, 12px);
   font-family: var(--table-font-family, var(--vscode-font-family));
   white-space: pre-wrap;
   word-break: break-word;
-  max-width: 400px;
+  max-width: 420px;
   vertical-align: top;
 }
 
@@ -260,20 +285,7 @@ th, td {
 /* ── Table footer ──────────────────────────────────────────── */
 #tableFooter {
   text-align: center;
-  padding: 10px;
-  border-top: 1px solid var(--vscode-panel-border);
-}
-
-/* ── Status bar ────────────────────────────────────────────── */
-#statusbar {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 3px 10px;
-  background: var(--vscode-statusBar-background);
-  color: var(--vscode-statusBar-foreground);
-  font-size: 11px;
-  flex-shrink: 0;
+  padding: 12px;
   border-top: 1px solid var(--vscode-panel-border);
 }
 
@@ -406,7 +418,8 @@ th, td {
 #importContent { width: 100%; resize: vertical; font-family: var(--vscode-editor-font-family); }
 
 /* ── Context menu ──────────────────────────────────────────── */
-#contextMenu {
+#contextMenu,
+#exportMenu {
   display: none;
   position: fixed;
   z-index: 300;
@@ -417,7 +430,8 @@ th, td {
   min-width: 150px;
   box-shadow: 2px 2px 8px rgba(0,0,0,.3);
 }
-#contextMenu.visible { display: block; }
+#contextMenu.visible,
+#exportMenu.visible { display: block; }
 .ctx-item {
   padding: 5px 16px;
   cursor: pointer;
@@ -432,4 +446,10 @@ th, td {
   height: 1px;
   background: var(--vscode-menu-separatorBackground, var(--vscode-panel-border));
   margin: 3px 0;
+}
+
+@media (max-width: 760px) {
+  .toolbar-density {
+    margin-left: 0;
+  }
 }

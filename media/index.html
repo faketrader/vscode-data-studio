@@ -12,34 +12,45 @@
         content="default-src 'none';
                  style-src {{CSP_SOURCE}} 'unsafe-inline';
                  script-src {{CSP_SOURCE}};">
-  <title>JSONL Table Explorer</title>
+  <title>Data Studio</title>
   <link rel="stylesheet" href="{{STYLES_URI}}">
 </head>
 <body>
 
 <!-- ── Toolbar ──────────────────────────────────────────────────────────── -->
 <div id="toolbar">
-  <span class="file-name" id="fileName">Loading…</span>
+  <div class="toolbar-group toolbar-primary">
+    <button id="btnSave" class="primary">💾 <span data-i18n="save">Save</span></button>
+    <button id="btnUndo" disabled aria-disabled="true">↶ <span data-i18n="undo">Undo</span></button>
+    <button id="btnRedo" disabled aria-disabled="true">↷ <span data-i18n="redo">Redo</span></button>
+  </div>
 
-  <button id="btnSave" class="primary">💾 <span data-i18n="save">Save</span></button>
-  <button id="btnOpenEditor">📄 <span data-i18n="openEditor">Open in Editor</span></button>
-  <button id="btnRefresh">⟳ <span data-i18n="refresh">Refresh</span></button>
-  <button id="btnFilter">🔍 <span data-i18n="filter">Filter</span></button>
-  <button id="btnStats">📊 <span data-i18n="stats">Stats</span></button>
-  <button id="btnImport">↑ <span data-i18n="import">Import</span></button>
-  <button id="btnExportCsv">↓ <span data-i18n="exportCsv">CSV</span></button>
-  <button id="btnExportJsonl">↓ <span data-i18n="exportJsonl">JSONL</span></button>
+  <div class="toolbar-group">
+    <button id="btnOpenEditor">📄 <span data-i18n="openEditor">Open in Editor</span></button>
+    <button id="btnRefresh">⟳ <span data-i18n="refresh">Refresh</span></button>
+    <button id="btnFilter">🔍 <span data-i18n="filter">Filter</span></button>
+    <button id="btnStats">📊 <span data-i18n="stats">Stats</span></button>
+  </div>
 
-  <span class="font-size-label" aria-hidden="true">A</span>
-  <input id="fontSizeInput" type="number" min="10" max="24" step="1" value="12" aria-label="Font size">
-  <select id="fontFamilySelect" aria-label="Font family">
-    <option value="var(--vscode-font-family)">VSCode</option>
-    <option value="Inter, var(--vscode-font-family)">Inter</option>
-    <option value="'PingFang SC', 'Microsoft YaHei', sans-serif">中文系统</option>
-    <option value="Consolas, 'Courier New', monospace">Monospace</option>
-  </select>
+  <div class="toolbar-group">
+    <button id="btnImport">↑ <span data-i18n="import">Import</span></button>
+    <button id="btnExport">↓ <span data-i18n="export">Export</span></button>
+  </div>
 
-  <button id="btnLang">🌐 EN</button>
+  <div class="toolbar-group toolbar-density">
+    <span class="font-size-label" aria-hidden="true">A</span>
+    <input id="fontSizeInput" type="number" min="10" max="24" step="1" value="12" aria-label="Font size">
+    <select id="fontFamilySelect" aria-label="Font family">
+      <option value="var(--vscode-font-family)">VSCode</option>
+      <option value="Inter, var(--vscode-font-family)">Inter</option>
+      <option value="'PingFang SC', 'Microsoft YaHei', sans-serif">中文系统</option>
+      <option value="Consolas, 'Courier New', monospace">Monospace</option>
+    </select>
+    <select id="langSelect" aria-label="Language">
+      <option value="en">🌐 EN</option>
+      <option value="zh">🌐 中文</option>
+    </select>
+  </div>
 </div>
 
 <!-- ── Filter row ───────────────────────────────────────────────────────── -->
@@ -63,14 +74,6 @@
   <div id="tableFooter">
     <button id="btnAddRowBottom" class="primary">+ <span data-i18n="addRow">Add Row</span></button>
   </div>
-</div>
-
-<!-- ── Status bar ───────────────────────────────────────────────────────── -->
-<div id="statusbar" aria-live="polite">
-  <span id="statusLoaded"></span>
-  <span id="statusTotal"></span>
-  <span id="statusFiltered" hidden></span>
-  <span id="statusSelected" hidden></span>
 </div>
 
 <!-- ── Loading indicator ────────────────────────────────────────────────── -->
@@ -125,11 +128,19 @@
 
 <!-- ── Context menu ──────────────────────────────────────────────────────── -->
 <div id="contextMenu" role="menu">
+  <div class="ctx-item" role="menuitem" data-ctx-action="insertAbove">＋ <span data-i18n="ctxInsertAbove">Add rows above…</span></div>
+  <div class="ctx-item" role="menuitem" data-ctx-action="insertBelow">＋ <span data-i18n="ctxInsertBelow">Add rows below…</span></div>
+  <div class="ctx-sep" role="separator"></div>
   <div class="ctx-item" role="menuitem" data-ctx-action="preview">👁 <span data-i18n="ctxPreview">Preview</span></div>
   <div class="ctx-item" role="menuitem" data-ctx-action="edit">✎ <span data-i18n="ctxEdit">Edit Row</span></div>
   <div class="ctx-sep" role="separator"></div>
   <div class="ctx-item" role="menuitem" data-ctx-action="copy">📋 <span data-i18n="ctxCopy">Copy JSON</span></div>
   <div class="ctx-item" role="menuitem" data-ctx-action="delete">🗑 <span data-i18n="ctxDelete">Delete Row</span></div>
+</div>
+
+<div id="exportMenu" role="menu">
+  <div class="ctx-item" role="menuitem" data-export-format="csv">↓ <span data-i18n="exportCsv">CSV</span></div>
+  <div class="ctx-item" role="menuitem" data-export-format="jsonl">↓ <span data-i18n="exportJsonl">JSONL</span></div>
 </div>
 
 <!-- ── Scripts (injected by WebviewContent.ts) ───────────────────────────── -->

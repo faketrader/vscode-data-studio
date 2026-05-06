@@ -37,7 +37,7 @@
         window.App.Toolbar.markDirty();
         break;
       case 'error':
-        console.error('[JSONL Explorer]', msg.message);
+        console.error('[Data Studio]', msg.message);
         break;
     }
   });
@@ -62,8 +62,6 @@
     S.columnOrder = cols.slice();
 
     S.rebuildDisplay();
-
-    document.getElementById('fileName').textContent = msg.fileName || 'data.jsonl';
 
     window.App.Toolbar.applyI18n();
     window.App.Renderer.renderTable();
@@ -109,14 +107,18 @@
 
     // Toolbar buttons
     _wire('btnSave',        'click',  function () { T.saveAll(); });
+    _wire('btnUndo',        'click',  function () { T.undo(); });
+    _wire('btnRedo',        'click',  function () { T.redo(); });
     _wire('btnOpenEditor',  'click',  function () { T.openInEditor(); });
     _wire('btnRefresh',     'click',  function () { T.requestRefresh(); });
     _wire('btnFilter',      'click',  function () { T.toggleFilter(); });
     _wire('btnStats',       'click',  function () { T.toggleStats(); });
     _wire('btnImport',      'click',  function () { M.openImport(); });
-    _wire('btnExportCsv',   'click',  function () { T.exportData('csv'); });
-    _wire('btnExportJsonl', 'click',  function () { T.exportData('jsonl'); });
-    _wire('btnLang',        'click',  function () { T.toggleLanguage(); });
+    _wire('btnExport',      'click',  function (e) {
+      e.stopPropagation();
+      T.showExportMenu(e.currentTarget);
+    });
+    _wire('langSelect',     'change', function () { T.setLanguage(this.value); });
     _wire('btnAddRowBottom','click',  function () { T.addRowDirect(); });
 
     // Font controls
@@ -157,15 +159,54 @@
         T.handleCtxAction(el.dataset.ctxAction);
       });
     });
+    document.querySelectorAll('[data-export-format]').forEach(function (el) {
+      el.addEventListener('click', function () {
+        T.handleExportAction(el.dataset.exportFormat);
+      });
+    });
 
     // Global: close context menu on click-away; close modals on Escape
-    document.addEventListener('click', function () { T.hideContextMenu(); });
+    document.addEventListener('click', function () {
+      T.hideContextMenu();
+      T.hideExportMenu();
+    });
     document.addEventListener('keydown', function (e) {
       if (e.key === 'Escape') {
         T.hideContextMenu();
+        T.hideExportMenu();
         M.closePreview();
         E.closeEditModal();
         M.closeImport();
+        return;
+      }
+
+      var mod = e.ctrlKey || e.metaKey;
+      if (!mod) return;
+
+      var key = String(e.key || '').toLowerCase();
+      var editable = e.target && (
+        e.target.tagName === 'INPUT' ||
+        e.target.tagName === 'TEXTAREA' ||
+        e.target.isContentEditable
+      );
+
+      if (key === 's') {
+        e.preventDefault();
+        T.saveAll();
+        return;
+      }
+
+      if (editable) return;
+
+      if (key === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        T.undo();
+        return;
+      }
+
+      if (key === 'y' || (key === 'z' && e.shiftKey)) {
+        e.preventDefault();
+        T.redo();
       }
     });
 

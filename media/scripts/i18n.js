@@ -18,27 +18,7 @@
   'use strict';
 
   /** @type {Record<string, Record<string, string>>} */
-  var _locales = {
-    en: {
-      save: 'Save', openEditor: 'Open in Editor', refresh: 'Refresh',
-      filter: 'Filter', stats: 'Stats', import: 'Import',
-      exportCsv: 'CSV', exportJsonl: 'JSONL', addRow: 'Add Row',
-      addField: 'Add Field', column: 'Column:', contains: 'Contains:',
-      clear: 'Clear', filterPlaceholder: 'filter text…',
-      loadingMore: 'Loading more rows…', copyJson: 'Copy JSON',
-      edit: 'Edit', close: 'Close', cancel: 'Cancel',
-      importTitle: 'Import Data',
-      importDesc: 'Paste CSV or JSONL content. This replaces all file contents.',
-      importRun: 'Import & Replace', noContentImport: 'No content to import.',
-      replaceConfirm: 'This will replace the entire file. Continue?',
-      deleteConfirm: 'Delete row {0}?',
-      ctxPreview: 'Preview', ctxEdit: 'Edit Row', ctxCopy: 'Copy JSON', ctxDelete: 'Delete Row',
-      colRename: 'Rename', colDelete: 'Delete Column', colStats: 'Column Stats',
-      loaded: 'Loaded: {0}', total: 'Total: {0}', filtered: 'Filtered: {0}',
-      selected: 'Selected: {0}', unsaved: '({0} unsaved)',
-      rowPreview: 'Row {0} Preview', editRow: 'Edit Row {0}', noData: 'No data'
-    }
-  };
+  var _locales = { en: {} };
 
   var _lang = 'en';
 

@@ -1,4 +1,4 @@
-# JSON Lines Explorer（VS Code 扩展）
+# VS Code Data Studio
 
 一个面向大文件 JSONL/NDJSON 的表格化编辑器，支持懒加载、筛选统计、批量修改、导入导出与中英文切换。
 

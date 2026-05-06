@@ -1,8 +1,12 @@
 import * as vscode from 'vscode';
 import { JsonlEditorProvider } from './editor/JsonlEditorProvider';
+import { registerAllFormats } from './formats';
 
 export function activate(context: vscode.ExtensionContext): void {
-  // Register custom editor provider for JSONL files
+  // Register all format handlers
+  registerAllFormats();
+
+  // Register custom editor provider
   const provider = new JsonlEditorProvider(context);
   context.subscriptions.push(
     vscode.window.registerCustomEditorProvider(
@@ -10,10 +14,10 @@ export function activate(context: vscode.ExtensionContext): void {
       provider,
       { webviewOptions: { retainContextWhenHidden: true }, supportsMultipleEditorsPerDocument: false }
     ),
-    vscode.commands.registerCommand('jsonlExplorer.openInEditor', (uri?: vscode.Uri) => {
+    vscode.commands.registerCommand('dataStudio.openInEditor', (uri?: vscode.Uri) => {
       if (uri) vscode.commands.executeCommand('vscode.openWith', uri, 'default');
     }),
-    vscode.commands.registerCommand('jsonlExplorer.refresh', () => {
+    vscode.commands.registerCommand('dataStudio.refresh', () => {
       provider.refreshActive();
     })
   );

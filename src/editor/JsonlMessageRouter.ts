@@ -1,7 +1,7 @@
 import * as path from 'node:path';
 import * as vscode from 'vscode';
 import { loadRows } from '../services/FileService';
-import { toCSV } from '../services/ExportService';
+import { serialize } from '../services/ExportService';
 import type { JsonlRow, SaveChangesPayload } from '../types';
 import { JsonlDocumentController } from './JsonlDocumentController';
 
@@ -78,9 +78,7 @@ export class JsonlMessageRouter {
     });
     if (!saveUri) return;
 
-    const content = format === 'csv'
-      ? toCSV(data)
-      : data.map((r) => JSON.stringify(r)).join('\n') + '\n';
+    const content = serialize(data, format);
 
     await vscode.workspace.fs.writeFile(saveUri, Buffer.from(content, 'utf8'));
     vscode.window.showInformationMessage(`Exported to ${saveUri.fsPath}`);

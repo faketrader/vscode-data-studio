@@ -1,96 +1,54 @@
 /**
  * @file services/FileService.ts
- * @description Low-level JSONL file I/O.
- * Responsible for reading rows from disk and applying batched mutations.
+ * @description Multi-format file I/O service.
+ * Supports multiple file formats via FormatRegistry.
  */
 
 import * as fs from 'node:fs';
-import * as readline from 'node:readline';
+import * as path from 'node:path';
 import type { JsonlRow, LoadResult, SaveChangesPayload } from '../types';
+import { FormatRegistry } from '../formats/FormatRegistry';
 
 /**
- * Reads a slice of rows from a JSONL file while counting total non-empty lines.
+ * Reads a slice of rows from a file (auto-detects format).
  *
  * Streams the file so it is memory-efficient for large files.
  *
- * @param filePath  Absolute path to the JSONL file.
+ * @param filePath  Absolute path to the file.
  * @param offset    Zero-based index of the first row to include.
  * @param count     Maximum number of rows to return.
  */
-export function loadRows(filePath: string, offset: number, count: number): Promise<LoadResult> {
-  const rows: JsonlRow[] = [];
-  const columnSet = new Set<string>();
-  let totalLines = 0;
-  let currentLine = 0;
+export async function loadRows(filePath: string, offset: number, count: number): Promise<LoadResult> {
+  const ext = path.extname(filePath).replace(/^\./, '');
+  const handler = FormatRegistry.getByExtension(ext);
 
-  return new Promise((resolve, reject) => {
-    const stream = fs.createReadStream(filePath, { encoding: 'utf8' });
-    const rl = readline.createInterface({ input: stream, crlfDelay: Infinity });
+  if (!handler) {
+    throw new Error(`Unsupported file format: ${ext}`);
+  }
 
-    rl.on('line', (line: string) => {
-      const trimmed = line.trim();
-      if (!trimmed) return;
-
-      totalLines++;
-
-      if (currentLine >= offset && currentLine < offset + count) {
-        try {
-          const obj = JSON.parse(trimmed) as JsonlRow;
-          rows.push(obj);
-          for (const k of Object.keys(obj)) columnSet.add(k);
-        } catch {
-          rows.push({ _raw: trimmed, _parseError: true });
-        }
-      }
-
-      currentLine++;
-    });
-
-    rl.on('close', () => resolve({ rows, totalLines, columns: [...columnSet] }));
-    rl.on('error', reject);
-    stream.on('error', reject);
-  });
+  return handler.loadRows(filePath, offset, count);
 }
 
 /**
- * Applies batched changes to JSONL file content and returns the new string.
+ * Applies batched changes to file content and returns the new string.
+ * Automatically detects the file format and delegates to the appropriate handler.
  *
- * Operations are applied in this order:
- *   1. Deletes (by original row index, descending to keep indices stable)
- *   2. Updates (replace JSON on the matched line)
- *   3. Appends new rows at the end
- *
- * @param originalContent  Current file text.
- * @param payload          Batch of changes from the webview.
+ * @param filePath        Absolute path to the file (used for format detection).
+ * @param originalContent Current file text.
+ * @param payload         Batch of changes from the webview.
  */
 export function applyChanges(
+  filePath: string,
   originalContent: string,
-  payload: Required<SaveChangesPayload>
+  payload: SaveChangesPayload
 ): string {
-  const { updates, adds } = payload;
-  const deleteSet = new Set(payload.deletes);
+  const ext = path.extname(filePath).replace(/^\./, '');
+  const handler = FormatRegistry.getByExtension(ext);
 
-  // Map every non-empty line to its logical row index
-  const rawLines = originalContent.split('\n');
-  const validIndices: number[] = [];
-  for (let i = 0; i < rawLines.length; i++) {
-    if (rawLines[i].trim()) validIndices.push(i);
+  if (!handler) {
+    throw new Error(`Unsupported file format: ${ext}`);
   }
 
-  const updateMap = new Map(updates.map((u) => [u.rowIndex, u.rowData]));
-
-  const resultLines: string[] = [];
-
-  for (let vi = 0; vi < validIndices.length; vi++) {
-    if (deleteSet.has(vi)) continue;
-
-    const updated = updateMap.get(vi);
-    resultLines.push(updated ? JSON.stringify(updated) : rawLines[validIndices[vi]]);
-  }
-
-  for (const row of adds) {
-    resultLines.push(JSON.stringify(row));
-  }
-
-  return resultLines.join('\n') + '\n';
+  const deleteSet = new Set(payload.deletes ?? []);
+  return handler.applyChanges(originalContent, payload.updates, payload.adds, deleteSet);
 }

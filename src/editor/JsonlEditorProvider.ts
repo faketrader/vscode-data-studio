@@ -11,7 +11,6 @@
  */
 
 import * as vscode from 'vscode';
-import * as path from 'node:path';
 import { loadRows } from '../services/FileService';
 import { getWebviewContent } from '../webview/WebviewContent';
 import { getAllLocales } from '../i18n';
@@ -19,7 +18,7 @@ import { JsonlDocumentController } from './JsonlDocumentController';
 import { JsonlMessageRouter } from './JsonlMessageRouter';
 
 export class JsonlEditorProvider implements vscode.CustomTextEditorProvider {
-  public static readonly viewType = 'jsonlExplorer.Editor';
+  public static readonly viewType = 'dataStudio.Editor';
 
   /** Active panels keyed by document URI string. */
   private readonly panels = new Map<string, vscode.WebviewPanel>();
@@ -43,7 +42,7 @@ export class JsonlEditorProvider implements vscode.CustomTextEditorProvider {
     const key = document.uri.toString();
     this.panels.set(key, panel);
 
-    const config = vscode.workspace.getConfiguration('jsonlExplorer');
+    const config = vscode.workspace.getConfiguration('dataStudio');
     const defaultPageSize = config.get<number>('defaultPageSize', 100);
     const batchSize = config.get<number>('lazyLoadBatchSize', 50);
     const language = config.get<string>('language', 'en');
@@ -69,7 +68,6 @@ export class JsonlEditorProvider implements vscode.CustomTextEditorProvider {
       ...initial,
       batchSize,
       language,
-      fileName: path.basename(document.uri.fsPath),
       locales: getAllLocales()
     });
 
@@ -103,7 +101,7 @@ export class JsonlEditorProvider implements vscode.CustomTextEditorProvider {
       await router.handle(msg);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      vscode.window.showErrorMessage(`JSONL Explorer: ${message}`);
+      vscode.window.showErrorMessage(`Data Studio: ${message}`);
       panel.webview.postMessage({ type: 'error', message });
     }
   }

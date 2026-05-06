@@ -25,8 +25,41 @@
   // ── Entry points ──────────────────────────────────────────────────────────
 
   function renderTable() {
+    autoComputeColumnWidths();
     renderHead();
     renderBody();
+  }
+
+  function autoComputeColumnWidths() {
+    if (!S.columnOrder.length) return;
+
+    var canvas = autoComputeColumnWidths._canvas;
+    if (!canvas) {
+      canvas = document.createElement('canvas');
+      autoComputeColumnWidths._canvas = canvas;
+    }
+
+    var ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    var probe = document.querySelector('#tableBody td') || document.body;
+    ctx.font = window.getComputedStyle(probe).font || '12px sans-serif';
+
+    var sampleRows = S.displayRows.slice(0, 200);
+    S.columnOrder.forEach(function (col) {
+      if (S.manualColumnWidths[col]) return;
+
+      var maxWidth = ctx.measureText(String(col)).width + 56;
+      sampleRows.forEach(function (row) {
+        if (!row) return;
+        var text = S.formatValue(row[col]);
+        if (text.length > 120) text = text.slice(0, 120) + '…';
+        var w = ctx.measureText(text).width + 24;
+        if (w > maxWidth) maxWidth = w;
+      });
+
+      S.columnWidths[col] = Math.max(100, Math.min(560, Math.ceil(maxWidth)));
+    });
   }
 
   // ── Table head ────────────────────────────────────────────────────────────
@@ -123,11 +156,6 @@
       tr.appendChild(th);
     });
 
-    // Action column header
-    var thAct = document.createElement('th');
-    thAct.style.width = '32px';
-    thAct.style.cursor = 'default';
-    tr.appendChild(thAct);
   }
 
   // ── Table body ────────────────────────────────────────────────────────────
@@ -163,7 +191,7 @@
     var tr = document.createElement('tr');
     // Stable row key: original index for saved rows, tempId for new ones
     var rowKey = row.__isNew ? row.__tempId : String(row.__rowIndex);
-    var rawIndex = row.__isNew ? -1 : row.__rowIndex;
+    var rawIndex = S.rawRows.indexOf(row);
 
     tr.dataset.rowKey = rowKey;
     if (window.AppState.selectedRows[rowKey]) tr.classList.add('selected');
@@ -207,7 +235,7 @@
     });
     tr.addEventListener('contextmenu', function (e) {
       e.preventDefault();
-      window.App.Toolbar.setCtxRow(rawIndex);
+      window.App.Toolbar.setCtxRow(row);
       window.App.Toolbar.showContextMenu(e.clientX, e.clientY);
     });
 
@@ -228,21 +256,6 @@
       });
       tr.appendChild(td);
     });
-
-    // ── Delete button ──
-    var tdAct = document.createElement('td');
-    tdAct.className = 'row-actions';
-    var delBtn = document.createElement('button');
-    delBtn.className = 'danger';
-    delBtn.textContent = '✕';
-    delBtn.title = 'Delete row';
-    delBtn.setAttribute('aria-label', 'Delete row');
-    delBtn.addEventListener('click', function (e) {
-      e.stopPropagation();
-      window.App.Toolbar.deleteRow(row);
-    });
-    tdAct.appendChild(delBtn);
-    tr.appendChild(tdAct);
 
     return tr;
   }
@@ -288,28 +301,7 @@
   // ── Status bar ────────────────────────────────────────────────────────────
 
   function updateStatus() {
-    var t = window.I18n.t;
-    document.getElementById('statusLoaded').textContent =
-      t('loaded', String(S.rawRows.filter(Boolean).length));
-    document.getElementById('statusTotal').textContent =
-      t('total', String(S.totalLines));
-
-    var filteredEl = document.getElementById('statusFiltered');
-    if (S.filterActive) {
-      filteredEl.removeAttribute('hidden');
-      filteredEl.textContent = t('filtered', String(S.displayRows.length));
-    } else {
-      filteredEl.setAttribute('hidden', '');
-    }
-
-    var selEl = document.getElementById('statusSelected');
-    var selCount = Object.keys(S.selectedRows).filter(function (k) { return S.selectedRows[k]; }).length;
-    if (selCount > 0) {
-      selEl.removeAttribute('hidden');
-      selEl.textContent = t('selected', String(selCount));
-    } else {
-      selEl.setAttribute('hidden', '');
-    }
+    // Kept as a stable render hook; the visible status bar was removed.
   }
 
   /** Rebuilds the column filter <select> options. */

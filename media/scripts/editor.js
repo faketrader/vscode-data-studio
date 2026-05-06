@@ -40,11 +40,15 @@
       var parsed;
       try { parsed = JSON.parse(raw); } catch (_) { parsed = raw; }
 
+      var before = row[col];
+      var changed = JSON.stringify(before) !== JSON.stringify(parsed);
+      if (changed) S.pushHistory();
+
       row[col] = parsed;
       S.rebuildDisplay();
       td.textContent = S.formatValue(parsed);
 
-      _trackChange(row);
+      if (changed) _trackChange(row);
       _activeCellRef = null;
 
       window.App.Toolbar.markDirty();
@@ -124,6 +128,7 @@
     closeEditModal();
 
     if (_editRow) {
+      S.pushHistory();
       Object.assign(_editRow, obj);
       S.rebuildDisplay();
       window.App.Renderer.renderBody();

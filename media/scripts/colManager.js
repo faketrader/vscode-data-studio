@@ -61,6 +61,7 @@
 
     function onMove(ev) {
       var w = Math.max(60, startW + (ev.clientX - startX));
+      S.manualColumnWidths[col] = true;
       S.columnWidths[col] = w;
       th.style.width = w + 'px';
       // Sync all data cells in this column
@@ -122,6 +123,8 @@
     var newName = prompt(window.I18n.t('colRename') + ' "' + col + '" →', col);
     if (!newName || newName === col) return;
 
+    S.pushHistory();
+
     S.rawRows.forEach(function (r) {
       if (!r || !(col in r)) return;
       r[newName] = r[col];
@@ -139,6 +142,8 @@
 
   function _deleteColumn(col) {
     if (!confirm(window.I18n.t('colDelete') + ' "' + col + '"?')) return;
+
+    S.pushHistory();
 
     S.rawRows.forEach(function (r) {
       if (!r || !(col in r)) return;
@@ -211,12 +216,15 @@
     dragRowEnd();
     if (from === -1 || from === targetRawIndex) return;
 
+    S.pushHistory();
+
     // Optimistic local reorder
     var moved = S.rawRows.splice(from, 1)[0];
     S.rawRows.splice(targetRawIndex, 0, moved);
     S.rebuildDisplay();
     window.App.Renderer.renderBody();
     window.App.Renderer.updateStatus();
+    window.App.Toolbar.updateHistoryButtons();
 
     // Persist via extension
     window.App.vscode.postMessage({ type: 'reorderRows', fromIndex: from, toIndex: targetRawIndex });

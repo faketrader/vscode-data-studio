@@ -12,7 +12,7 @@
 
   // ── Context menu state ────────────────────────────────────────────────────
 
-  var _ctxRowIndex = -1;
+  var _ctxRow = null;
 
   // ── Save ──────────────────────────────────────────────────────────────────
 
@@ -28,6 +28,20 @@
     if (count > 0) label += ' ' + window.I18n.t('unsaved', String(count));
     btn.textContent = label;
     btn.style.opacity = count > 0 ? '1' : '.75';
+    updateHistoryButtons();
+  }
+
+  /** Updates Undo/Redo button disabled and accessible state from AppState. */
+  function updateHistoryButtons() {
+    _setHistoryButton('btnUndo', S.canUndo());
+    _setHistoryButton('btnRedo', S.canRedo());
+  }
+
+  function _setHistoryButton(id, enabled) {
+    var btn = document.getElementById(id);
+    if (!btn) return;
+    btn.disabled = !enabled;
+    btn.setAttribute('aria-disabled', enabled ? 'false' : 'true');
   }
 
   /**
@@ -43,7 +57,12 @@
     var deletes = Object.keys(S.pendingDeletes)
       .filter(function (k) { return S.pendingDeletes[k]; })
       .map(function (k) { return parseInt(k, 10); });
-    var adds = S.pendingAdds.map(function (r) { return S.stripMeta(r); });
+    var adds = S.pendingAdds.map(function (r) {
+      return {
+        rowData: S.stripMeta(r),
+        insertAt: r.__insertAt == null ? null : Number(r.__insertAt)
+      };
+    });
 
     if (updates.length === 0 && deletes.length === 0 && adds.length === 0) return;
 
@@ -57,20 +76,57 @@
    * The row is tracked in `pendingAdds` and only written on Save.
    */
   function addRowDirect() {
-    var row = {};
-    S.columnOrder.forEach(function (c) { row[c] = ''; });
-    S.attachMeta(row, -1, true);
-    S.rawRows.push(row);
-    S.rebuildDisplay();
-    S.pendingAdds.push(row);
-
-    window.App.Renderer.renderBody();
-    window.App.Renderer.updateStatus();
-    markDirty();
+    addRowsAt(null, 1);
 
     // Scroll to bottom so the new row is visible
     var tc = document.getElementById('tableContainer');
     tc.scrollTop = tc.scrollHeight;
+  }
+
+  function createBlankRow(insertAt) {
+    var row = {};
+    S.columnOrder.forEach(function (c) { row[c] = ''; });
+    S.attachMeta(row, -1, true);
+    row.__insertAt = insertAt == null ? null : Number(insertAt);
+    return row;
+  }
+
+  function addRowsAt(insertAt, count) {
+    var n = Math.max(1, Math.min(500, parseInt(String(count), 10) || 1));
+    S.pushHistory();
+
+    for (var i = 0; i < n; i++) {
+      var row = createBlankRow(insertAt == null ? null : Number(insertAt) + (i / 1000));
+      S.rawRows.push(row);
+      S.pendingAdds.push(row);
+    }
+
+    S.rebuildDisplay();
+    window.App.Renderer.renderTable();
+    window.App.Renderer.updateStatus();
+    markDirty();
+  }
+
+  function promptRowCount() {
+    var text = prompt(window.I18n.t('insertCountPrompt'), '1');
+    if (text == null) return 0;
+    var n = parseInt(text, 10);
+    return Number.isFinite(n) && n > 0 ? n : 0;
+  }
+
+  function insertRowsAround(row, direction) {
+    if (!row) return;
+    var count = promptRowCount();
+    if (!count) return;
+
+    if (row.__isNew && row.__insertAt != null) {
+      var newAnchor = Number(row.__insertAt);
+      addRowsAt(direction === 'above' ? newAnchor - 0.001 : newAnchor + 0.001, count);
+      return;
+    }
+
+    var anchor = Number(row.__rowIndex) * 2;
+    addRowsAt(direction === 'above' ? anchor - 1 : anchor + 1, count);
   }
 
   /**
@@ -81,17 +137,20 @@
     var displayNo = row.__isNew ? 'N' : String(row.__rowIndex + 1);
     if (!confirm(window.I18n.t('deleteConfirm', displayNo))) return;
 
+    S.pushHistory();
+
     if (row.__isNew) {
       // Remove from pending adds entirely
       S.pendingAdds = S.pendingAdds.filter(function (r) { return r.__tempId !== row.__tempId; });
+      var idx = S.rawRows.indexOf(row);
+      if (idx !== -1) S.rawRows.splice(idx, 1);
     } else {
       S.pendingDeletes[String(row.__rowIndex)] = true;
       delete S.pendingUpdates[String(row.__rowIndex)];
+      // Keep original row-index mapping stable for pending deletes/updates.
+      S.rawRows[row.__rowIndex] = null;
     }
 
-    // Remove from in-memory arrays
-    var ri = S.rawRows.indexOf(row);
-    if (ri !== -1) S.rawRows.splice(ri, 1);
     S.rebuildDisplay();
 
     window.App.Renderer.renderBody();
@@ -174,9 +233,8 @@
 
   // ── Language toggle ───────────────────────────────────────────────────────
 
-  function toggleLanguage() {
-    var next = window.I18n.getLang() === 'en' ? 'zh' : 'en';
-    window.I18n.setLanguage(next);
+  function setLanguage(lang) {
+    window.I18n.setLanguage(lang);
     applyI18n();
     markDirty();
   }
@@ -188,18 +246,20 @@
 
     window.I18n.applyToDOM();
 
-    document.getElementById('btnLang').textContent = '🌐 ' + (lang === 'zh' ? '中文' : 'EN');
+    var langSelect = document.getElementById('langSelect');
+    if (langSelect) langSelect.value = lang;
     document.getElementById('filterVal').placeholder = t('filterPlaceholder');
     document.getElementById('loadingIndicator').querySelector('[data-i18n]').textContent = t('loadingMore');
 
     markDirty(); // re-render save button label in current language
+    updateHistoryButtons();
     window.App.Renderer.updateStatus();
   }
 
   // ── Context menu ──────────────────────────────────────────────────────────
 
-  function setCtxRow(index) {
-    _ctxRowIndex = index;
+  function setCtxRow(row) {
+    _ctxRow = row || null;
   }
 
   function showContextMenu(x, y) {
@@ -218,13 +278,42 @@
     document.getElementById('contextMenu').classList.remove('visible');
   }
 
+  function showExportMenu(anchor) {
+    if (!anchor) return;
+    var menu = document.getElementById('exportMenu');
+    var rect = anchor.getBoundingClientRect();
+    menu.classList.add('visible');
+    menu.style.left = rect.left + 'px';
+    menu.style.top = (rect.bottom + 4) + 'px';
+
+    var menuRect = menu.getBoundingClientRect();
+    if (menuRect.right > window.innerWidth) menu.style.left = (rect.right - menuRect.width) + 'px';
+    if (menuRect.bottom > window.innerHeight) menu.style.top = (rect.top - menuRect.height - 4) + 'px';
+  }
+
+  function hideExportMenu() {
+    var menu = document.getElementById('exportMenu');
+    if (menu) menu.classList.remove('visible');
+  }
+
+  function handleExportAction(format) {
+    hideExportMenu();
+    exportData(format === 'csv' ? 'csv' : 'jsonl');
+  }
+
   function handleCtxAction(action) {
     hideContextMenu();
-    var ri = _ctxRowIndex;
-    var row = S.rawRows[ri];
+    var row = _ctxRow;
     if (!row) return;
 
-    if (action === 'preview') {
+    var ri = S.rawRows.indexOf(row);
+    if (ri < 0) return;
+
+    if (action === 'insertAbove') {
+      insertRowsAround(row, 'above');
+    } else if (action === 'insertBelow') {
+      insertRowsAround(row, 'below');
+    } else if (action === 'preview') {
       window.App.Modals.openPreview(ri);
     } else if (action === 'edit') {
       window.App.Editor.openEditModal(ri);
@@ -236,6 +325,27 @@
     }
   }
 
+  function _rerenderAfterHistoryChange() {
+    S.rebuildDisplay();
+    window.App.Renderer.renderTable();
+    window.App.Renderer.updateStatus();
+    window.App.Renderer.updateFilterSelect();
+    window.App.Renderer.updateColStats();
+    markDirty();
+  }
+
+  function undo() {
+    window.App.Editor.flushActiveEdit();
+    if (!S.undo()) return;
+    _rerenderAfterHistoryChange();
+  }
+
+  function redo() {
+    window.App.Editor.flushActiveEdit();
+    if (!S.redo()) return;
+    _rerenderAfterHistoryChange();
+  }
+
   // ── Misc toolbar ─────────────────────────────────────────────────────────
 
   function openInEditor() {
@@ -245,6 +355,7 @@
   function requestRefresh() {
     S.reset();
     window.App.Renderer.renderTable();
+    updateHistoryButtons();
     window.App.vscode.postMessage({ type: 'loadMore', offset: 0, count: 100 });
   }
 
@@ -261,6 +372,7 @@
   window.App = window.App || {};
   window.App.Toolbar = {
     markDirty: markDirty,
+    updateHistoryButtons: updateHistoryButtons,
     saveAll: saveAll,
     addRowDirect: addRowDirect,
     deleteRow: deleteRow,
@@ -271,12 +383,17 @@
     toggleStats: toggleStats,
     setFontSize: setFontSize,
     setFontFamily: setFontFamily,
-    toggleLanguage: toggleLanguage,
+    setLanguage: setLanguage,
     applyI18n: applyI18n,
     setCtxRow: setCtxRow,
     showContextMenu: showContextMenu,
     hideContextMenu: hideContextMenu,
+    showExportMenu: showExportMenu,
+    hideExportMenu: hideExportMenu,
+    handleExportAction: handleExportAction,
     handleCtxAction: handleCtxAction,
+    undo: undo,
+    redo: redo,
     openInEditor: openInEditor,
     requestRefresh: requestRefresh,
     exportData: exportData

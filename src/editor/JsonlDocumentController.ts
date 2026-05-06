@@ -1,10 +1,10 @@
 import * as vscode from 'vscode';
 import { applyChanges } from '../services/FileService';
-import { fromCSV, fromJSONL } from '../services/ExportService';
+import { deserialize, serialize } from '../services/ExportService';
 import type { JsonlRow, SaveChangesPayload } from '../types';
 
 /**
- * Owns all text-document mutations for JSONL files.
+ * Owns all text-document mutations for supported file formats.
  *
  * This class is intentionally VS Code document-centric and contains no webview
  * transport logic, which keeps mutation behavior easy to reason about.
@@ -13,13 +13,7 @@ export class JsonlDocumentController {
   constructor(private readonly document: vscode.TextDocument) {}
 
   public async saveChanges(payload: SaveChangesPayload): Promise<void> {
-    const normalized: Required<SaveChangesPayload> = {
-      updates: payload.updates ?? [],
-      deletes: payload.deletes ?? [],
-      adds: payload.adds ?? []
-    };
-
-    const newContent = applyChanges(this.document.getText(), normalized);
+    const newContent = applyChanges(this.document.uri.fsPath, this.document.getText(), payload);
     await this.replaceWholeDocument(newContent);
   }
 
@@ -45,9 +39,14 @@ export class JsonlDocumentController {
   }
 
   public async importRows(content: string, format: string): Promise<void> {
-    const rows: JsonlRow[] = format === 'csv' ? fromCSV(content) : fromJSONL(content);
-    const newContent = rows.map((r) => JSON.stringify(r)).join('\n') + '\n';
+    const rows: JsonlRow[] = deserialize(content, format);
+    const newContent = serialize(rows, this.detectFormat());
     await this.replaceWholeDocument(newContent);
+  }
+
+  private detectFormat(): string {
+    const ext = this.document.uri.fsPath.split('.').pop()?.toLowerCase() ?? '';
+    return ext === 'csv' ? 'csv' : 'jsonl';
   }
 
   private async replaceWholeDocument(newContent: string): Promise<void> {

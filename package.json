@@ -1,9 +1,9 @@
 {
-  "name": "json-lines-explorer",
-  "displayName": "JSON Lines Explorer",
-  "description": "Efficiently preview and edit JSONL files in a table view with lazy loading, filtering, statistics, import/export support.",
-  "version": "0.1.0",
-  "publisher": "jsonl-explorer",
+  "name": "data-studio",
+  "displayName": "Data Studio",
+  "description": "Efficiently preview and edit JSONL, CSV and other data formats in a table view with lazy loading, filtering, statistics, import/export support.",
+  "version": "0.2.0",
+  "publisher": "data-studio",
   "engines": {
     "vscode": "^1.85.0"
   },
@@ -15,9 +15,11 @@
   "keywords": [
     "jsonl",
     "json lines",
+    "csv",
     "table",
     "editor",
-    "preview"
+    "preview",
+    "data"
   ],
   "activationEvents": [],
   "main": "./dist/extension.js",
@@ -29,14 +31,17 @@
   "contributes": {
     "customEditors": [
       {
-        "viewType": "jsonlExplorer.Editor",
-        "displayName": "JSON Lines Explorer",
+        "viewType": "dataStudio.Editor",
+        "displayName": "Data Studio",
         "selector": [
           {
             "filenamePattern": "*.jsonl"
           },
           {
             "filenamePattern": "*.ndjson"
+          },
+          {
+            "filenamePattern": "*.csv"
           }
         ],
         "priority": "default"
@@ -44,30 +49,30 @@
     ],
     "commands": [
       {
-        "command": "jsonlExplorer.openInEditor",
+        "command": "dataStudio.openInEditor",
         "title": "Open in Text Editor",
         "icon": "$(file-code)"
       },
       {
-        "command": "jsonlExplorer.refresh",
+        "command": "dataStudio.refresh",
         "title": "Refresh",
         "icon": "$(refresh)"
       }
     ],
     "configuration": {
-      "title": "JSON Lines Explorer",
+      "title": "Data Studio",
       "properties": {
-        "jsonlExplorer.defaultPageSize": {
+        "dataStudio.defaultPageSize": {
           "type": "number",
           "default": 100,
           "description": "Number of rows to load initially"
         },
-        "jsonlExplorer.lazyLoadBatchSize": {
+        "dataStudio.lazyLoadBatchSize": {
           "type": "number",
           "default": 50,
           "description": "Number of rows to load per batch during lazy loading"
         },
-        "jsonlExplorer.theme": {
+        "dataStudio.theme": {
           "type": "string",
           "enum": [
             "auto",
@@ -77,14 +82,14 @@
           "default": "auto",
           "description": "Table theme"
         },
-        "jsonlExplorer.language": {
+        "dataStudio.language": {
           "type": "string",
           "enum": [
             "en",
             "zh"
           ],
           "default": "en",
-          "description": "UI language for JSON Lines Explorer"
+          "description": "UI language for Data Studio"
         }
       }
     }
@@ -98,7 +103,7 @@
     "vsix": "bunx @vscode/vsce package --no-dependencies --allow-missing-repository --skip-license"
   },
   "devDependencies": {
-    "@types/node": "^24.0.0",
+    "@types/node": "^25.6.0",
     "@types/vscode": "^1.85.0",
     "@vscode/test-electron": "^2.5.0",
     "typescript": "^6.0.0",

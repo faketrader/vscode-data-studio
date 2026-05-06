@@ -45,6 +45,8 @@
 
   /** @type {Record<string, number>} col name → pixel width */
   var columnWidths = {};
+  /** @type {Record<string, boolean>} col name → user-resized flag */
+  var manualColumnWidths = {};
 
   // ── Pending changes (not yet saved to disk) ───────────────────────────────
 
@@ -54,6 +56,12 @@
   var pendingDeletes = {};
   /** @type {Array<Record<string, unknown>>} new rows to append */
   var pendingAdds = [];
+
+  // ── Undo / redo history ──────────────────────────────────────────────────
+
+  var HISTORY_LIMIT = 100;
+  var undoStack = [];
+  var redoStack = [];
 
   // ── Row metadata ──────────────────────────────────────────────────────────
 
@@ -73,7 +81,8 @@
       __rowIndex: { value: rowIndex, writable: true, enumerable: false, configurable: true },
       __isNew:    { value: !!isNew,  writable: true, enumerable: false, configurable: true },
       __tempId:   { value: isNew ? 'tmp-' + (_nextId++) : '', writable: true, enumerable: false, configurable: true },
-      __localId:  { value: 'loc-' + (_nextId++),              writable: true, enumerable: false, configurable: true }
+      __localId:  { value: 'loc-' + (_nextId++),              writable: true, enumerable: false, configurable: true },
+      __insertAt: { value: null, writable: true, enumerable: false, configurable: true }
     });
     return row;
   }
@@ -105,11 +114,160 @@
     pendingAdds = [];
   }
 
+  function _deepCloneValue(v) {
+    if (v == null) return v;
+    if (typeof v !== 'object') return v;
+    if (typeof structuredClone === 'function') return structuredClone(v);
+    try {
+      return JSON.parse(JSON.stringify(v));
+    } catch (_) {
+      return v;
+    }
+  }
+
+  function _serializeRow(row) {
+    if (!row) return null;
+    var data = {};
+    var keys = Object.keys(row);
+    for (var i = 0; i < keys.length; i++) data[keys[i]] = _deepCloneValue(row[keys[i]]);
+    return {
+      data: data,
+      meta: {
+        rowIndex: row.__rowIndex,
+        isNew: !!row.__isNew,
+        tempId: row.__tempId || '',
+        localId: row.__localId || '',
+        insertAt: row.__insertAt == null ? null : Number(row.__insertAt)
+      }
+    };
+  }
+
+  function _deserializeRow(saved) {
+    if (!saved) return null;
+    var row = saved.data || {};
+    Object.defineProperties(row, {
+      __rowIndex: { value: saved.meta.rowIndex, writable: true, enumerable: false, configurable: true },
+      __isNew:    { value: !!saved.meta.isNew, writable: true, enumerable: false, configurable: true },
+      __tempId:   { value: saved.meta.tempId || '', writable: true, enumerable: false, configurable: true },
+      __localId:  { value: saved.meta.localId || ('loc-' + (_nextId++)), writable: true, enumerable: false, configurable: true },
+      __insertAt: { value: saved.meta.insertAt == null ? null : Number(saved.meta.insertAt), writable: true, enumerable: false, configurable: true }
+    });
+    return row;
+  }
+
+  function _rowKey(row) {
+    return row.__isNew ? row.__tempId : String(row.__rowIndex);
+  }
+
+  function _captureSnapshot() {
+    var serializedRows = rawRows.map(function (r) { return _serializeRow(r); });
+    return {
+      rawRows: serializedRows,
+      displayRows: displayRows.map(function (r) { return r ? _rowKey(r) : ''; }).filter(Boolean),
+      columnOrder: columnOrder.slice(),
+      columnWidths: Object.assign({}, columnWidths),
+      manualColumnWidths: Object.assign({}, manualColumnWidths),
+      totalLines: totalLines,
+      loadedOffset: loadedOffset,
+      batchSize: batchSize,
+      isLoading: isLoading,
+      filterActive: filterActive,
+      filterCol: filterCol,
+      filterText: filterText,
+      sortCol: sortCol,
+      sortDir: sortDir,
+      selectedRows: Object.assign({}, selectedRows),
+      pendingUpdateKeys: Object.keys(pendingUpdates),
+      pendingDeleteKeys: Object.keys(pendingDeletes).filter(function (k) { return pendingDeletes[k]; }),
+      pendingAddKeys: pendingAdds.map(function (r) { return r.__tempId; }),
+      nextId: _nextId
+    };
+  }
+
+  function _restoreSnapshot(snapshot) {
+    rawRows = snapshot.rawRows.map(function (s) { return _deserializeRow(s); });
+
+    var keyMap = {};
+    rawRows.forEach(function (r) {
+      if (!r) return;
+      keyMap[_rowKey(r)] = r;
+    });
+
+    displayRows = snapshot.displayRows
+      .map(function (k) { return keyMap[k]; })
+      .filter(function (r) { return !!r; });
+
+    columnOrder = snapshot.columnOrder.slice();
+    columnWidths = Object.assign({}, snapshot.columnWidths);
+    manualColumnWidths = Object.assign({}, snapshot.manualColumnWidths);
+
+    totalLines = snapshot.totalLines;
+    loadedOffset = snapshot.loadedOffset;
+    batchSize = snapshot.batchSize;
+    isLoading = snapshot.isLoading;
+
+    filterActive = snapshot.filterActive;
+    filterCol = snapshot.filterCol;
+    filterText = snapshot.filterText;
+
+    sortCol = snapshot.sortCol;
+    sortDir = snapshot.sortDir;
+
+    selectedRows = Object.assign({}, snapshot.selectedRows);
+
+    pendingUpdates = {};
+    snapshot.pendingUpdateKeys.forEach(function (k) {
+      var r = keyMap[k];
+      if (r) pendingUpdates[k] = r;
+    });
+
+    pendingDeletes = {};
+    snapshot.pendingDeleteKeys.forEach(function (k) {
+      pendingDeletes[k] = true;
+    });
+
+    pendingAdds = snapshot.pendingAddKeys
+      .map(function (k) { return keyMap[k]; })
+      .filter(function (r) { return !!r; });
+
+    _nextId = snapshot.nextId;
+  }
+
+  function pushHistory() {
+    undoStack.push(_captureSnapshot());
+    if (undoStack.length > HISTORY_LIMIT) undoStack.shift();
+    redoStack = [];
+  }
+
+  function canUndo() {
+    return undoStack.length > 0;
+  }
+
+  function canRedo() {
+    return redoStack.length > 0;
+  }
+
+  function undo() {
+    if (!canUndo()) return false;
+    redoStack.push(_captureSnapshot());
+    _restoreSnapshot(undoStack.pop());
+    return true;
+  }
+
+  function redo() {
+    if (!canRedo()) return false;
+    undoStack.push(_captureSnapshot());
+    _restoreSnapshot(redoStack.pop());
+    return true;
+  }
+
   /** Full reset — called on init / reload. */
   function reset() {
     rawRows = [];
     displayRows = [];
     columnOrder = [];
+    columnWidths = {};
+    manualColumnWidths = {};
     totalLines = 0;
     loadedOffset = 0;
     isLoading = false;
@@ -119,6 +277,8 @@
     sortCol = '';
     sortDir = 1;
     selectedRows = {};
+    undoStack = [];
+    redoStack = [];
     resetPending();
   }
 
@@ -158,7 +318,24 @@
    * Call after any data or filter change.
    */
   function rebuildDisplay() {
-    displayRows = rawRows.filter(function (r) { return r != null && matchesFilter(r); });
+    var rows = rawRows.filter(function (r) { return r != null && matchesFilter(r); });
+    displayRows = rows.slice().sort(function (a, b) {
+      var ap = _displayPosition(a);
+      var bp = _displayPosition(b);
+      if (ap !== bp) return ap - bp;
+      return _creationPosition(a) - _creationPosition(b);
+    });
+  }
+
+  function _displayPosition(row) {
+    if (row.__isNew && row.__insertAt != null) return Number(row.__insertAt);
+    if (row.__isNew) return Number.MAX_SAFE_INTEGER;
+    return row.__rowIndex * 2;
+  }
+
+  function _creationPosition(row) {
+    if (row.__isNew) return Number(String(row.__tempId || '').replace('tmp-', '')) || Number.MAX_SAFE_INTEGER;
+    return row.__rowIndex * 2;
   }
 
   // ── Public API ────────────────────────────────────────────────────────────
@@ -189,6 +366,7 @@
 
     // Display settings
     get columnWidths() { return columnWidths; },
+    get manualColumnWidths() { return manualColumnWidths; },
 
     // Pending changes
     get pendingUpdates() { return pendingUpdates; }, set pendingUpdates(v) { pendingUpdates = v; },
@@ -202,6 +380,11 @@
     stripMeta: stripMeta,
     formatValue: formatValue,
     matchesFilter: matchesFilter,
-    rebuildDisplay: rebuildDisplay
+    rebuildDisplay: rebuildDisplay,
+    pushHistory: pushHistory,
+    canUndo: canUndo,
+    canRedo: canRedo,
+    undo: undo,
+    redo: redo
   };
 }());

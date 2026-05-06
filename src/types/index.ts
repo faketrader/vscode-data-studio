@@ -15,5 +15,5 @@ export interface SaveChangesPayload {
   updates?: Array<{ rowIndex: number; rowData: JsonlRow }>;
   /** Original row indices to delete (before updates are applied). */
   deletes?: number[];
-  adds?: JsonlRow[];
+  adds?: Array<JsonlRow | { rowData: JsonlRow; insertAt?: number | null }>;
 }
