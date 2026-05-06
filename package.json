@@ -1,0 +1,107 @@
+{
+  "name": "json-lines-explorer",
+  "displayName": "JSON Lines Explorer",
+  "description": "Efficiently preview and edit JSONL files in a table view with lazy loading, filtering, statistics, import/export support.",
+  "version": "0.1.0",
+  "publisher": "jsonl-explorer",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "packageManager": "bun@1.3.0",
+  "categories": [
+    "Other",
+    "Data Science"
+  ],
+  "keywords": [
+    "jsonl",
+    "json lines",
+    "table",
+    "editor",
+    "preview"
+  ],
+  "activationEvents": [],
+  "main": "./dist/extension.js",
+  "files": [
+    "dist/**",
+    "media/**",
+    "package.json"
+  ],
+  "contributes": {
+    "customEditors": [
+      {
+        "viewType": "jsonlExplorer.Editor",
+        "displayName": "JSON Lines Explorer",
+        "selector": [
+          {
+            "filenamePattern": "*.jsonl"
+          },
+          {
+            "filenamePattern": "*.ndjson"
+          }
+        ],
+        "priority": "default"
+      }
+    ],
+    "commands": [
+      {
+        "command": "jsonlExplorer.openInEditor",
+        "title": "Open in Text Editor",
+        "icon": "$(file-code)"
+      },
+      {
+        "command": "jsonlExplorer.refresh",
+        "title": "Refresh",
+        "icon": "$(refresh)"
+      }
+    ],
+    "configuration": {
+      "title": "JSON Lines Explorer",
+      "properties": {
+        "jsonlExplorer.defaultPageSize": {
+          "type": "number",
+          "default": 100,
+          "description": "Number of rows to load initially"
+        },
+        "jsonlExplorer.lazyLoadBatchSize": {
+          "type": "number",
+          "default": 50,
+          "description": "Number of rows to load per batch during lazy loading"
+        },
+        "jsonlExplorer.theme": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "light",
+            "dark"
+          ],
+          "default": "auto",
+          "description": "Table theme"
+        },
+        "jsonlExplorer.language": {
+          "type": "string",
+          "enum": [
+            "en",
+            "zh"
+          ],
+          "default": "en",
+          "description": "UI language for JSON Lines Explorer"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "bun run package",
+    "build": "bun run compile",
+    "compile": "bunx tsup",
+    "watch": "bunx tsup --watch",
+    "package": "bunx tsup --minify",
+    "vsix": "bunx @vscode/vsce package --no-dependencies --allow-missing-repository --skip-license"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@types/vscode": "^1.85.0",
+    "@vscode/test-electron": "^2.5.0",
+    "typescript": "^6.0.0",
+    "tsup": "^8.5.0"
+  }
+}
